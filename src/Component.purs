@@ -39,6 +39,8 @@ component =
               then "Don't push me"
               else "I said don't push me!"
           ]
+      , HH.div_
+          [ HH.text "Why not toggle this button:" ]
       ]
 
   eval :: Query ~> H.ComponentDSL State Query Void m
