@@ -5,12 +5,11 @@ import Prelude
 import Data.Array (snoc, filter, length)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Symbol (SProxy(..))
-import Task (TaskQuery(..), TaskMessage(..), TaskSlot, task)
-import Model (List, TaskId, initialList, initialTask)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
+import Model (List, TaskId, initialList, initialTask)
+import Task (TaskQuery(..), TaskMessage(..), task)
 
 -- | The list component query algebra.
 data ListQuery a
@@ -18,26 +17,23 @@ data ListQuery a
   | AllDone a
   | HandleTaskMessage TaskId TaskMessage a
 
-type ChildSlots =
-  ( task :: TaskSlot TaskId
-  )
-
-_task = SProxy :: SProxy "task"
+-- | The slot value that is filled by tasks during the install process.
+newtype TaskSlot = TaskSlot TaskId
+derive instance eqTaskSlot :: Eq TaskSlot
+derive instance ordTaskSlot :: Ord TaskSlot
 
 -- | The list component definition.
 list :: forall m. Applicative m => H.Component HH.HTML ListQuery Unit Void m
 list =
-  H.component
+  H.parentComponent
     { initialState: const initialList
     , render
     , eval
     , receiver: const Nothing
-    , initializer: Nothing
-    , finalizer: Nothing
     }
   where
 
-  render :: List -> H.ComponentHTML ListQuery ChildSlots m
+  render :: List -> H.ParentHTML ListQuery TaskQuery TaskSlot m
   render st =
     HH.div_
       [ HH.h1_ [ HH.text "Todo list" ]
@@ -53,25 +49,26 @@ list =
           [ HH.text "All Done" ]
       ]
 
-  renderTask :: TaskId -> H.ComponentHTML ListQuery ChildSlots m
+  renderTask :: TaskId -> H.ParentHTML ListQuery TaskQuery TaskSlot m
   renderTask taskId =
-    HH.slot _task taskId
+    HH.slot
+      (TaskSlot taskId)
       (task initialTask)
       unit
       (HE.input (HandleTaskMessage taskId))
 
-  eval :: ListQuery ~> H.HalogenM List ListQuery ChildSlots Void m
+  eval :: ListQuery ~> H.ParentDSL List ListQuery TaskQuery TaskSlot Void m
   eval (NewTask next) = do
     H.modify_ addTask
     pure next
   eval (AllDone next) = do
-    toggled <- H.queryAll _task (H.action (ToggleCompleted true))
+    toggled <- H.queryAll (H.action (ToggleCompleted true))
     H.modify_ $ updateNumCompleted (const (M.size toggled))
     pure next
   eval (HandleTaskMessage p msg next) = do
     case msg of
       NotifyRemove -> do
-        wasComplete <- H.query _task p (H.request IsCompleted)
+        wasComplete <- H.query (TaskSlot p) (H.request IsCompleted)
         when (fromMaybe false wasComplete) $ H.modify_ $ updateNumCompleted (_ `sub` 1)
         H.modify_ (removeTask p)
       Toggled b ->

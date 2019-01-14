@@ -6,8 +6,9 @@ import Halogen.Aff as HA
 import Halogen.VDom.Driver (runUI)
 
 import Component (component)
+import List (list)
 
 main :: Effect Unit
 main = HA.runHalogenAff do
   body <- HA.awaitBody
-  runUI component unit body
+  runUI list unit body
